@@ -6,7 +6,7 @@ homepage: https://developers.converly.io
 metadata:
   openclaw:
     envVars:
-      CONVERLY_API_KEY:
+      - name: CONVERLY_API_KEY
         required: false
         description: Optional. Only needed for headless use. The normal path is `converly login`, which opens a browser and stores credentials locally, no key handling involved.
 ---
@@ -21,10 +21,10 @@ Every CLI command prints one JSON document to stdout. Exit code 0 means success.
 
 1. **Never handle credentials in chat.** Do not ask the user to paste an API key, and never print `CONVERLY_API_KEY` or any token. Authentication is `converly login`, which happens in the user's browser.
 2. **Connecting an ad platform requires a human.** `converly destinations connect` returns a URL the user must open in their browser. Never claim a destination is connected until `converly handoffs wait <id>` returns `"status": "completed"`. Never skip this step, and never work around it by asking for tokens.
-3. **Never report tracking as working until it is proven.** Proof is `converly test-event` returning `"server_status": "success"`, or a real conversion appearing in `converly events list`. Publishing a flow is not proof.
+3. **Be precise about what is verified.** `converly test-event` returning `"server_status": "success"` proves the DELIVERY half: Converly can reach the ad platform and the platform accepted the conversion. It does not prove the website half (snippet on the page, right form tool slug). Full proof is `install status` showing `"detection": "confirmed"`, or a real form submission appearing in `converly events list` with a successful action status. Report exactly which level you verified. Publishing a flow proves nothing by itself.
 4. **Set the site's domain before publishing.** A site with `"domain": null` rejects every event server side. The flow will publish fine and capture nothing. Check `converly sites list` and fix with `converly sites update <site_id> --domain <their-domain>` before you publish.
-5. **Do not delete or unpublish anything you did not create in this session** without the user explicitly confirming first.
-6. **If a command fails twice with the same error, stop and show the user the error.** Do not loop retries.
+5. **Destructive actions need explicit user confirmation first.** Deleting a flow (`flows delete` requires `--yes`), unpublishing a flow that is live, disconnecting a destination, or any DELETE via `converly api`. Never do these on your own initiative, even for things you created this session.
+6. **If a command fails twice with the same error, stop and show the user the error.** Do not loop retries. If you must retry a create command after an ambiguous failure, re-run it with the same `--idempotency-key` value so it cannot double-create.
 
 ## Setup
 
@@ -40,7 +40,7 @@ Authenticate. First check state with `converly whoami`:
 
 - If it succeeds, you are logged in. It returns the subscription and the account's sites.
 - If it fails with `not_logged_in`, run `converly login` and tell the user a browser window will open for them to log in. If they do not have a Converly account yet, run `converly login --signup` instead. Signing up starts a free trial automatically, no card needed. Wait for the command to finish, then re-run `converly whoami`.
-- If `CONVERLY_API_KEY` is set in the environment, the CLI uses it automatically and no login is needed.
+- If `CONVERLY_API_KEY` is set in the environment, the CLI uses it automatically for Converly's own deployments. If commands then fail saying the key was rejected, the key is bad. Ask the user to replace or unset it; do not try to work around it.
 
 ## The setup workflow
 
@@ -84,7 +84,9 @@ See what is available and what is already connected:
 converly destinations list
 ```
 
-If the target platform shows `"connected": false`:
+**First check whether this destination needs a connection at all.** In the `destinations types` output, a destination with an empty `connection_types` list is browser side (Microsoft Ads, X Ads, Pinterest, Snapchat, the analytics pixels): there is nothing to connect, skip straight to step 4. Details in [references/destinations.md](references/destinations.md).
+
+For connected destinations (`google-ads`, `meta`, `google-analytics`, `linkedin-ads`, `tiktok-ads`, `reddit-ads`) showing `"connected": false`:
 
 ```
 converly destinations connect google-ads --site site_XXXX
@@ -96,7 +98,7 @@ Give the user the returned `url` and say: "Open this link in your browser to con
 converly handoffs wait hdf_XXXX
 ```
 
-This blocks up to 10 minutes. Links expire after 30 minutes; if the handoff expires, create a fresh one. Destination types: `google-ads`, `meta`, `google-analytics`, `linkedin-ads`, `tiktok-ads`, `reddit-ads`. Destinations are account wide, so one connection serves every flow.
+This blocks up to 10 minutes; the link itself is valid for 30. If the wait times out while the link is still valid, re-run `handoffs wait` with the same id rather than creating a new link (the error message tells you which case you are in). Destinations are account wide, so one connection serves every flow.
 
 ### 4. Find the trigger
 
@@ -141,15 +143,21 @@ converly flows publish flow_XXXX
 
 `validate` returns `problems[]` (blockers, fix before publishing) and `warnings[]` (site readiness, for example `site_missing_domain`). Take warnings seriously, they are the "publishes fine, captures nothing" cases.
 
-### 6. Verify end to end
+### 6. Verify
+
+Verification has two halves. Do both when you can, and say exactly which you did.
+
+**Delivery (always do this):**
 
 ```
 converly test-event --flow flow_XXXX
 ```
 
-This fires a real test conversion through to the ad platform and returns the platform's response. `"server_status": "success"` is your proof. For Meta, pass `--meta-code TEST12345` (from Meta Events Manager → Test events) so the test shows up there without polluting real data.
+This fires a test conversion through Converly's server to the ad platform and returns the platform's response. `"server_status": "success"` proves the connection, the flow config, and the conversion mapping all work. For Meta, pass `--meta-code TEST12345` (from Meta Events Manager → Test events) so the test shows up there without polluting real data.
 
-Only now report success to the user. Tell them: tracking is live, verified with a test conversion delivered to [platform], and real conversions will appear when someone submits the form after clicking an ad.
+**Capture (proves the website half):** either `converly install status site_XXXX` already shows `"detection": "confirmed"`, or ask the user to submit the real form once, then find that submission in `converly events list` with a successful action status.
+
+Report accordingly. After delivery only: "Delivery to [platform] is verified with a test conversion. The final check is one real form submission, which will appear in the conversion log." After both: "Tracking is verified end to end."
 
 ### 7. Keep their own traffic out
 
@@ -187,20 +195,29 @@ Health checks: `converly install status <site>` (is the loader still live), `con
 
 ## Quick reference
 
+Every line below is one complete, runnable command.
+
 ```
-converly login [--signup]                # browser login, trial auto starts on signup
-converly whoami                          # account, subscription, sites
-converly sites list / update <id> --domain X
-converly install snippet <site> / install status <site>
-converly destinations list / connect <type> --site <id>
-converly handoffs wait <hdf_id>          # block until human finishes OAuth
-converly triggers                        # form tool slugs
-converly destinations conversions <type> # pickable conversion actions
-converly actions <type>                  # action config schema
-converly flows create/validate/publish/unpublish/list/get/delete
-converly test-event --flow <id>          # end to end proof
-converly events list/get                 # the conversion log
-converly rules create --email-pattern X  # exclude internal traffic
+converly login --signup                        # browser login, trial auto starts on signup
+converly whoami                                # account, subscription, sites
+converly sites list
+converly sites update <site_id> --domain example.com
+converly install snippet <site_id>
+converly install status <site_id>
+converly destinations types                    # catalogue incl. connection_types
+converly destinations list                     # what's connected
+converly destinations connect <type> --site <site_id>
+converly handoffs wait <hdf_id>                # block until human finishes OAuth
+converly triggers                              # form tool slugs
+converly destinations conversions <type>       # pickable conversion actions
+converly actions <type>                        # action config schema
+converly flows create --site <site_id> --name "X" --trigger <slug> --destination <type> --conversion-id <id>
+converly flows validate <flow_id>
+converly flows publish <flow_id>
+converly test-event --flow <flow_id>           # verify destination delivery
+converly events list --limit 20                # the conversion log
+converly events get <evt_id>                   # per destination delivery detail
+converly rules create --email-pattern '*@x.com' --description "Internal"
 ```
 
 ## Deeper docs

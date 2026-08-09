@@ -33,17 +33,21 @@ If you have repo or page access, inspect the form markup and decide yourself. Em
 The simple CLI form defaults to all pages (`pageFilter: "all"`). Narrow with:
 
 - `--pages /contact,/demo` for specific pages.
-- A specific form id or CSS selector goes in the trigger config via `--json`, for example:
+- A specific form id or CSS selector goes in the trigger config via `--json`. Note `--json` on `flows create` takes the WHOLE flow body, so a narrowed trigger looks like this complete example (swap in the real site id, action config, and form id):
 
 ```json
 {
-  "trigger_config": {
-    "integrationId": "gravity-forms",
-    "pageFilter": "all",
-    "formId": "5"
-  }
+  "site_id": "site_XXXX",
+  "name": "Gravity form 5 to Google Ads",
+  "trigger_config": { "integrationId": "gravity-forms", "pageFilter": "all", "formId": "5" },
+  "actions_config": [
+    { "id": "act-1", "integrationId": "google-ads",
+      "config": { "conversion": { "id": "123456789" }, "enhancedConversions": true } }
+  ]
 }
 ```
+
+To narrow an existing flow instead, pass just the changed field to `converly flows update <flow_id> --json '{"trigger_config": {...}}'`.
 
 Run `converly triggers` and read `filters[]` for the trigger type to see what each type supports (`form_id`, `form_selector`, `page_path_filter`, `event_name`).
 
@@ -51,7 +55,7 @@ Run `converly triggers` and read `filters[]` for the trigger type to see what ea
 
 Work through, in order:
 
-1. `converly install status <site>` shows the loader was seen? If not, the snippet is not on the page (or is blocked by a consent manager until the visitor accepts).
+1. `converly install status <site>`. Read `detection` precisely: `"confirmed"` means the site half works, look further down this list. `"never_seen"` is NOT proof the snippet is missing (a correct install with no conversions yet looks identical), it just means nothing is proven yet. `"pending"` means the check itself couldn't run right now, try again shortly. Only conclude "snippet missing" from actually inspecting the page's HTML, never from this endpoint.
 2. Site domain set and matching the real origin? `converly sites list` → `domain`. A staging URL or a different subdomain will be rejected.
 3. Flow published? `converly flows get <id>` → `status` must be `published`, `publication_state` should be `in_sync`.
 4. Right provider slug for what actually renders the form? (See "Picking the right slug".)

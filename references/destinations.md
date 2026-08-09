@@ -49,20 +49,40 @@ Config shape:
 ## LinkedIn Ads (`linkedin-ads`)
 
 - Connect via handoff (paste token path inside the popup).
-- Fires a specific conversion rule. Pick from `converly destinations conversions linkedin-ads`.
+- Fires a specific conversion rule, picked exactly like Google Ads conversions:
+
+```
+converly destinations conversions linkedin-ads
+converly flows create --site site_XXXX --name "Leads to LinkedIn" \
+  --trigger generic-form --destination linkedin-ads --conversion-id <id from the list>
+```
 
 ## TikTok Ads (`tiktok-ads`) and Reddit Ads (`reddit-ads`)
 
-- Connect via handoff. Then pick or name the event per `converly actions <type>`.
+- Connect via handoff first.
+- Then run `converly actions tiktok-ads` (or `reddit-ads`) and build the flow from its `config_example`. The pattern is always the same, only the config differs:
+
+```
+converly actions tiktok-ads
+converly flows create --json '{
+  "site_id": "site_XXXX",
+  "name": "Leads to TikTok",
+  "trigger_config": { "integrationId": "generic-form", "pageFilter": "all" },
+  "actions_config": [{ "id": "act-1", "integrationId": "tiktok-ads",
+    "config": <the config_example from converly actions, with your values> }]
+}'
+```
+
+Do not guess config field names for these destinations. Copy `config_example` and substitute values.
 
 ## Browser side pixels (no connection)
 
 For `microsoft-ads`, `x-ads`, `pinterest-ads`, `snapchat-ads`, `adroll`, `taboola`, `plausible-analytics`, `fathom-analytics`, `gosquared`, `simple-analytics`, `pirsch-analytics`:
 
-- No connect step. Create the flow with the destination slug and the event config from `converly actions <type>`, publish, done.
-- The platform's own base pixel must already be installed on the site. Converly tells the pixel to fire the conversion; it does not install the pixel.
-- Delivery is browser side only, so ad blockers can suppress these. For platforms where both options exist, the connected server side path is stronger.
+- No connect step (`converly destinations connect` will refuse and tell you so). Run `converly actions <type>`, build the flow with its `config_example` via `--json` exactly as in the TikTok example above, publish, done.
+- The platform's own base pixel must already be installed on the site. Converly tells the pixel to fire the conversion; it does not install the pixel. If you have page access, verify the pixel script is present before promising anything.
+- Delivery is browser side only, so ad blockers can suppress these. Note `converly test-event` exercises server side delivery and does NOT apply to browser side destinations; verification here is a real form submission appearing in `converly events list`.
 
 ## ChatGPT Ads (`chatgpt-ads`)
 
-- Connect via handoff. Inside the popup the user pastes an Ads API key and picks a data source. Then configure the action per `converly actions chatgpt-ads`.
+- Connect via handoff. Inside the popup the user pastes an Ads API key and picks a data source (never take that key yourself). Then run `converly actions chatgpt-ads` and build the flow from its `config_example` via `--json`.
