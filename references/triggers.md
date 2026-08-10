@@ -26,7 +26,7 @@ If you have repo or page access, inspect the form markup and decide yourself. Em
 - `form_submission` - about 80 providers: Gravity Forms, Contact Form 7, WPForms, Elementor, Typeform, Jotform, Webflow, Wix, Squarespace, Framer, Unbounce, HubSpot, Mailchimp, Marketo, Tally, Fillout, ClickFunnels, and more. Requires at least one filter (see below); "all forms on all pages" plus one filter type is the norm.
 - `chat_started` - LiveChat, Intercom, Drift, Tawk.to, HubSpot Chat and similar. Fires when a visitor starts a conversation.
 - `meeting_booked` - Calendly, Acuity, Cal.com, OnceHub, SavvyCal style booking tools. Some of these can additionally be connected platform side in the Converly dashboard for richer data (attendee details); the browser detection works without it.
-- `custom_event` - no provider. The site's own JavaScript calls Converly's API to report a conversion. See the install page in the dashboard for the call signature.
+- `custom_event` - exists in the catalogue but cannot be set up through this surface. Never offer it, and never improvise a custom-event workaround for an unsupported tool. If no listed provider fits, say so plainly.
 
 ## Filters
 

@@ -22,9 +22,10 @@ Every CLI command prints one JSON document to stdout. Exit code 0 means success.
 1. **Never handle credentials in chat.** Do not ask the user to paste an API key, and never print `CONVERLY_API_KEY` or any token. Authentication is `converly login`, which happens in the user's browser.
 2. **Connecting an ad platform requires a human.** `converly destinations connect` returns a URL the user must open in their browser. Never claim a destination is connected until `converly handoffs wait <id>` returns `"status": "completed"`. Never skip this step, and never work around it by asking for tokens.
 3. **Be precise about what is verified.** `converly test-event` returning `"server_status": "success"` proves the DELIVERY half: Converly can reach the ad platform and the platform accepted the conversion. It does not prove the website half (snippet on the page, right form tool slug). Full proof is `install status` showing `"detection": "confirmed"`, or a real form submission appearing in `converly events list` with a successful action status. Report exactly which level you verified. Publishing a flow proves nothing by itself.
-4. **Set the site's domain before publishing.** A site with `"domain": null` rejects every event server side. The flow will publish fine and capture nothing. Check `converly sites list` and fix with `converly sites update <site_id> --domain <their-domain>` before you publish.
-5. **Destructive actions need explicit user confirmation first.** Deleting a flow (`flows delete` requires `--yes`), unpublishing a flow that is live, disconnecting a destination, or any DELETE via `converly api`. Never do these on your own initiative, even for things you created this session.
-6. **If a command fails twice with the same error, stop and show the user the error.** Do not loop retries. If you must retry a create command after an ambiguous failure, re-run it with the same `--idempotency-key` value so it cannot double-create.
+4. **Never pass `--allow-real` without the user's explicit agreement in this conversation.** It reports a real conversion to their ad platform. Ask, wait for yes, then run it.
+5. **Set the site's domain before publishing.** A site with `"domain": null` rejects every event server side. The flow will publish fine and capture nothing. Check `converly sites list` and fix with `converly sites update <site_id> --domain <their-domain>` before you publish.
+6. **Destructive actions need explicit user confirmation first.** Deleting a flow (`flows delete` requires `--yes`), unpublishing a flow that is live, disconnecting a destination, or any DELETE via `converly api`. Never do these on your own initiative, even for things you created this session.
+7. **If a command fails twice with the same error, stop and show the user the error.** Do not loop retries. If you must retry a create command after an ambiguous failure, re-run it with the same `--idempotency-key` value so it cannot double-create.
 
 ## Setup
 
@@ -52,7 +53,7 @@ Work through these steps in order. Steps 3 and 4 can run in parallel.
 converly sites list
 ```
 
-Every account has a default site. Use it unless the user is tracking a second website. If `domain` is null, set it now (hard rule 4):
+Every account has a default site. Use it unless the user is tracking a second website. If `domain` is null, set it now (hard rule 5):
 
 ```
 converly sites update site_XXXX --domain example.com
@@ -110,6 +111,8 @@ converly triggers
 
 Match the user's form tool to a slug in `providers[]` (for example `typeform`, `webflow-forms`, `gravity-forms`, `jotform`, `hubspot-forms`). For a hand coded HTML form use `generic-form`. If you have repo access, identify the form tool from the code instead of asking.
 
+Before choosing a trigger, establish what happens after the form is submitted. If submission is the end of the journey, use a form trigger. If there is a verification step, a payment, or onboarding between the form and the real outcome, a form trigger counts people who never converted. If you have codebase access, read the code and answer this yourself; otherwise ask the user.
+
 ### 5. Create and publish the flow
 
 For Google Ads, first pick which conversion action to fire:
@@ -153,7 +156,7 @@ Verification has two halves. Do both when you can, and say exactly which you did
 converly test-event --flow flow_XXXX
 ```
 
-This fires a test conversion through Converly's server to the ad platform and returns the platform's response. `"server_status": "success"` proves the connection, the flow config, and the conversion mapping all work. For Meta, pass `--meta-code TEST12345` (from Meta Events Manager → Test events) so the test shows up there without polluting real data.
+This fires a test conversion through Converly's server to the ad platform and returns the platform's response. `"server_status": "success"` proves the connection, the flow config, and the conversion mapping all work. For Meta pass `--meta-code` (from Meta Events Manager → Test events), for Reddit `--reddit-id`, for TikTok `--tiktok-code`, and the test then stays out of real data. Google Ads, GA4, LinkedIn and ChatGPT Ads have no sandbox mode, so the command will refuse with `would_create_real_conversion`. For those, either get the user's explicit OK to send one real test conversion and re-run with `--allow-real` (hard rule 4), or skip the test event and verify with a live form submission instead.
 
 **Capture (proves the website half):** either `converly install status site_XXXX` already shows `"detection": "confirmed"`, or ask the user to submit the real form once, then find that submission in `converly events list` with a successful action status.
 
