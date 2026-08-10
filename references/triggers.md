@@ -23,33 +23,20 @@ If you have repo or page access, inspect the form markup and decide yourself. Em
 
 ## Trigger types
 
-- `form_submission` - about 80 providers: Gravity Forms, Contact Form 7, WPForms, Elementor, Typeform, Jotform, Webflow, Wix, Squarespace, Framer, Unbounce, HubSpot, Mailchimp, Marketo, Tally, Fillout, ClickFunnels, and more. Requires at least one filter (see below); "all forms on all pages" plus one filter type is the norm.
+- `form_submission` - about 80 providers: Gravity Forms, Contact Form 7, WPForms, Elementor, Typeform, Jotform, Webflow, Wix, Squarespace, Framer, Unbounce, HubSpot, Mailchimp, Marketo, Tally, Fillout, ClickFunnels, and more. No filter is required. A flow with no `--pages` fires for every form of that type anywhere on the site, so offer page narrowing when the site has more than one form.
 - `chat_started` - LiveChat, Intercom, Drift, Tawk.to, HubSpot Chat and similar. Fires when a visitor starts a conversation.
-- `meeting_booked` - Calendly, Acuity, Cal.com, OnceHub, SavvyCal style booking tools. Some of these can additionally be connected platform side in the Converly dashboard for richer data (attendee details); the browser detection works without it.
-- `custom_event` - exists in the catalogue but cannot be set up through this surface. Never offer it, and never improvise a custom-event workaround for an unsupported tool. If no listed provider fits, say so plainly.
+- `meeting_booked` - Calendly, Acuity, Cal.com, OnceHub, SavvyCal style booking tools.
+- Connection-required providers. Read each provider's `setup` block in the catalogue. `requires_connection: true` (Typeform, Jotform, Calendly, Acuity today) means the tool must be connected with `converly triggers connect <slug> --site <id>` BEFORE its flow properly works. `capture_without_connection` tells you honestly what happens if the user declines (for example count-only capture with no visitor details). `post_connect_user_steps` lists steps the USER must still do outside Converly (Acuity's pasted snippet); Converly cannot verify those, so setup is only proven when the first event arrives.
+- `custom_event` - cannot be set up through this surface. Never offer it, and never improvise a custom-event workaround for an unsupported tool. If no listed provider fits, say so plainly.
 
 ## Filters
 
-The simple CLI form defaults to all pages (`pageFilter: "all"`). Narrow with:
+The simple CLI form defaults to all pages (`pageFilter: "all"`), and that is a valid, publishable flow. Narrowing options, honestly stated:
 
-- `--pages /contact,/demo` for specific pages.
-- A specific form id or CSS selector goes in the trigger config via `--json`. Note `--json` on `flows create` takes the WHOLE flow body, so a narrowed trigger looks like this complete example (swap in the real site id, action config, and form id):
+- **By page** (works for every browser-detected tool): `--pages /contact,/demo`. This is the supported narrowing on this surface. When the site has more than one form, ask which page the form the user cares about lives on and narrow to it, otherwise a contact form and a newsletter box report as the same conversion.
+- **By specific form or event type** (connection-required providers only): the connected platforms support narrowing to a real form or event type, but listing the account's actual forms is not available through the CLI yet. Create the flow unfiltered and tell the user they can narrow it to a specific form in the Converly dashboard's flow builder. Do not invent condition values.
 
-```json
-{
-  "site_id": "site_XXXX",
-  "name": "Gravity form 5 to Google Ads",
-  "trigger_config": { "integrationId": "gravity-forms", "pageFilter": "all", "formId": "5" },
-  "actions_config": [
-    { "id": "act-1", "integrationId": "google-ads",
-      "config": { "conversion": { "id": "123456789" }, "enhancedConversions": true } }
-  ]
-}
-```
-
-To narrow an existing flow instead, pass just the changed field to `converly flows update <flow_id> --json '{"trigger_config": {...}}'`.
-
-Run `converly triggers` and read `filters[]` for the trigger type to see what each type supports (`form_id`, `form_selector`, `page_path_filter`, `event_name`).
+To adjust an existing flow, pass just the changed field to `converly flows update <flow_id> --json '{"trigger_config": {...}}'`.
 
 ## When nothing fires
 

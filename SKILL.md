@@ -45,6 +45,20 @@ Authenticate. First check state with `converly whoami`:
 
 ## The setup workflow
 
+**Collect three facts before you build anything.** Answer them yourself
+from the repo or page when you have access; otherwise ask the user, all
+in one message rather than drip-feeding:
+
+1. **The website address.** Without it every conversion is rejected
+   server side (hard rule 5).
+2. **Which tool renders the form** (or booking widget / chat box). This
+   picks the trigger, decides which detection code loads on the site,
+   and decides whether a connect step is needed first (step 4).
+3. **What should count as the conversion.** If something must happen
+   after submission before it really counts (email verification,
+   payment, onboarding), a form trigger overcounts; use the `api`
+   trigger instead and say why.
+
 Work through these steps in order. Steps 3 and 4 can run in parallel.
 
 ### 1. Pick the site
@@ -101,7 +115,7 @@ converly handoffs wait hdf_XXXX
 
 This blocks up to 10 minutes; the link itself is valid for 30. If the wait times out while the link is still valid, re-run `handoffs wait` with the same id rather than creating a new link (the error message tells you which case you are in). Destinations are account wide, so one connection serves every flow.
 
-### 4. Find the trigger
+### 4. Find the trigger, and connect it if it needs connecting
 
 The trigger is the form tool on the user's website. Get the catalogue:
 
@@ -109,9 +123,25 @@ The trigger is the form tool on the user's website. Get the catalogue:
 converly triggers
 ```
 
-Match the user's form tool to a slug in `providers[]` (for example `typeform`, `webflow-forms`, `gravity-forms`, `jotform`, `hubspot-forms`). For a hand coded HTML form use `generic-form`. If you have repo access, identify the form tool from the code instead of asking.
+Match the user's form tool to a slug in `providers[]` (for example `webflow-forms`, `gravity-forms`, `hubspot-forms`). For a hand coded HTML form use `generic-form`. If you have repo access, identify the form tool from the code instead of asking.
 
-Before choosing a trigger, establish what happens after the form is submitted. If submission is the end of the journey, use a form trigger. If there is a verification step, a payment, or onboarding between the form and the real outcome, a form trigger counts people who never converted. If you have codebase access, read the code and answer this yourself; otherwise ask the user.
+**Check the provider's `setup` block before using its slug.** Most tools have `requires_connection: false` and their slug goes straight into `flows create`. A few (Typeform, Jotform, Calendly, Acuity Scheduling today, read the data, never a memorized list) have `requires_connection: true`. Those must be connected FIRST, or the flow tracks nothing properly:
+
+```
+converly triggers connect typeform --site site_XXXX
+```
+
+Give the user the returned `url` (they sign in to the tool there, or paste its API key), then confirm completion the same way as a destination:
+
+```
+converly handoffs wait hdf_XXXX
+```
+
+When the completed result lists anything in `user_steps_remaining`, the connection alone is NOT the whole setup. Relay each step to the user and treat setup as unfinished until they confirm it is done. Acuity is the standing example. Its bookings are only reported once the user pastes a tracking snippet inside Acuity's own settings (the connect window shows them the snippet). Converly cannot verify that step happened, so never report Acuity setup as complete on connection alone; the proof is the first booking appearing in `converly events list`.
+
+The same honesty applies to `capture_without_connection` in the setup block. It tells you what actually happens if the user declines to connect (for example Typeform still reports bare submission counts but no visitor details, so ad platforms match poorly). Use it to explain tradeoffs truthfully, not to skip the connect step.
+
+Before choosing a trigger type at all, apply fact 3 from the interview. If there is a verification step, a payment, or onboarding between the form and the real outcome, a form trigger counts people who never converted; use the `api` trigger instead.
 
 ### 5. Create and publish the flow
 
