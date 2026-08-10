@@ -89,7 +89,7 @@ Returns the `<script>` tag.
 Check with `converly install status site_XXXX`. Read `detection` carefully:
 
 - `"confirmed"` means tracking is proven live.
-- `"never_seen"` does NOT mean the snippet is missing. A correctly installed site that has not captured a conversion yet looks exactly like this. Do not tell the user the install failed based on this value. The test event in step 6 is the real check.
+- `"never_seen"` does NOT mean the snippet is missing. A correctly installed site that has not captured a conversion yet looks exactly like this. Do not tell the user the install failed based on this value. The test event in step 6 checks the delivery half; the install itself is proven by a real submission appearing in `converly events list` (hard rule 3).
 
 ### 3. Connect the ad platform
 
