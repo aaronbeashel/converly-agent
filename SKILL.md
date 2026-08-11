@@ -141,6 +141,8 @@ When the completed result lists anything in `user_steps_remaining`, the connecti
 
 The same honesty applies to `capture_without_connection` in the setup block. It tells you what actually happens if the user declines to connect (for example Typeform still reports bare submission counts but no visitor details, so ad platforms match poorly). Use it to explain tradeoffs truthfully, not to skip the connect step.
 
+Once a connection-required platform is connected, you can narrow the flow to one specific form or event type instead of firing on all of them. List the account's real ones with `converly triggers options <slug> --site site_XXXX`, offer the user a specific value, and write it back as `trigger_config.conditions` (the full shape is in references/triggers.md → Filters). This is optional, an unfiltered flow is valid and publishable. Browser-detected form tools do not support this, narrow those by page with `--pages` instead.
+
 Before choosing a trigger type at all, apply fact 3 from the interview. If there is a verification step, a payment, or onboarding between the form and the real outcome, a form trigger counts people who never converted; use the `api` trigger instead.
 
 ### 5. Create and publish the flow
@@ -165,7 +167,7 @@ converly flows create --site site_XXXX --name "Leads to Meta" \
   --trigger webflow-forms --destination meta --event-name Lead
 ```
 
-Add `--value 50 --currency USD` if the user wants a conversion value. Restrict to specific pages with `--pages /contact,/demo`. For anything richer (multiple actions, filters on a specific form), pass the whole flow body with `--json`; run `converly actions <destination>` to see each destination's config schema.
+Add `--value 50 --currency USD` if the user wants a conversion value. Restrict to specific pages with `--pages /contact,/demo`. For a connected platform (Typeform, Jotform, Calendly, Acuity) you can narrow to one real form or event type. List them with `converly triggers options <slug> --site <id>`, then set `trigger_config.conditions` via `--json`. For anything richer (multiple actions), pass the whole flow body with `--json`; run `converly actions <destination>` to see each destination's config schema.
 
 Then validate and publish:
 
@@ -192,13 +194,16 @@ This fires a test conversion through Converly's server to the ad platform and re
 
 Report accordingly. After delivery only: "Delivery to [platform] is verified with a test conversion. The final check is one real form submission, which will appear in the conversion log." After both: "Tracking is verified end to end."
 
-### 7. Keep their own traffic out
+### 7. Internal-traffic rules: registration only, NOT enforced yet
 
-Offer to exclude the team's own form testing:
-
-```
-converly rules create --email-pattern '*@theircompany.com' --description "Internal team"
-```
+`converly rules create` records an exclusion rule, but the rules are not
+applied anywhere today — a matching submission still fires to every
+destination. Do NOT offer this as a way to keep test traffic out, and
+never tell the user their team's submissions are being excluded. If they
+ask, say plainly that exclusion rules are planned but not active, and
+that internal test conversions mostly cannot become ad conversions
+anyway (no ad click to match). This section updates when enforcement
+ships.
 
 ## After setup: reading results
 
@@ -250,7 +255,6 @@ converly flows publish <flow_id>
 converly test-event --flow <flow_id>           # verify destination delivery
 converly events list --limit 20                # the conversion log
 converly events get <evt_id>                   # per destination delivery detail
-converly rules create --email-pattern '*@x.com' --description "Internal"
 ```
 
 ## Deeper docs
