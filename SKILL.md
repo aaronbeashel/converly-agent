@@ -145,6 +145,8 @@ Once a connection-required platform is connected, you can narrow the flow to one
 
 Before choosing a trigger type at all, apply fact 3 from the interview. If there is a verification step, a payment, or onboarding between the form and the real outcome, a form trigger counts people who never converted; use the `api` trigger instead.
 
+The `api` trigger has no form tool to detect, so its setup is different. Connect it with `converly triggers connect api --site site_XXXX`, which hands back a webhook URL and secret that the user's backend calls when the conversion is confirmed. For a Node backend, the `@converly/sdk-node` package does the signed call in a few lines (`npm install @converly/sdk-node`, then `createClient` and `completeSignup`). Other stacks call the webhook directly. The full backend guide is at developers.converly.io/api-trigger. This needs code access, so it suits agents working in the site's repo.
+
 ### 5. Create and publish the flow
 
 For Google Ads, first pick which conversion action to fire:
