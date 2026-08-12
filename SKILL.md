@@ -125,6 +125,12 @@ converly triggers
 
 Match the user's form tool to a slug in `providers[]` (for example `webflow-forms`, `gravity-forms`, `hubspot-forms`). For a hand coded HTML form use `generic-form`. If you have repo access, identify the form tool from the code instead of asking.
 
+**Custom sites are the one case where `generic-form` is not automatically the right answer.** Detection is dependable for a known form tool, whose markup and submit behaviour Converly knows. A hand coded form on a Next.js, Astro, SvelteKit or Remix site varies far more, and many post to a backend route or server action rather than submitting the classic way. So when you are working in the site's code and the form posts to a backend, the `api` trigger is often more reliable. The backend confirms the conversion directly instead of relying on the browser catching a bespoke form, and you are already in the code, which is the part a human would find fiddly.
+
+Put the call where the handler (route handler, server action, or whatever processes the submission) has confirmed the submission actually succeeded, not at the top of it. Every call to the webhook counts a conversion, so firing before validation would count failed and spam attempts too. Ask the user before editing their code.
+
+Use `generic-form` when the form is genuinely simple, you do not have code access, or the user prefers no code changes.
+
 **Check the provider's `setup` block before using its slug.** Most tools have `requires_connection: false` and their slug goes straight into `flows create`. A few (Typeform, Jotform, Calendly, Acuity Scheduling today, read the data, never a memorized list) have `requires_connection: true`. Those must be connected FIRST, or the flow tracks nothing properly:
 
 ```
