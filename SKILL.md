@@ -32,10 +32,10 @@ Every CLI command prints one JSON document to stdout. Exit code 0 means success.
 Install the CLI if it is missing:
 
 ```
-npm install -g converly
+npm install -g @converly/cli
 ```
 
-(Or run every command through `npx converly@latest ...` without installing.)
+(Or run every command through `npx @converly/cli ...` without installing.)
 
 Authenticate. First check state with `converly whoami`:
 

@@ -28,7 +28,7 @@ One step is always yours: authorizing the ad platform. The agent hands you a lin
 
 ## Under the hood
 
-The skill drives the [`converly` CLI](https://www.npmjs.com/package/converly) (`npm install -g converly`), which wraps Converly's [public REST API](https://developers.converly.io). Also available: the Converly MCP server at `https://app.converly.io/mcp` for Claude and ChatGPT connector users.
+The skill drives the [`converly` CLI](https://www.npmjs.com/package/@converly/cli) (`npm install -g @converly/cli`), which wraps Converly's [public REST API](https://developers.converly.io). Also available: the Converly MCP server at `https://app.converly.io/mcp` for Claude and ChatGPT connector users.
 
 ## License
 
