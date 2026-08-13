@@ -156,25 +156,30 @@ The `api` trigger has no form tool to detect, so its setup is different. Connect
 
 ### 5. Create and publish the flow
 
-For Google Ads, first pick which conversion action to fire:
+**Always let the user pick the conversion. Never choose one for them.** Every destination has its own list, and firing the wrong one quietly corrupts the numbers the user is trying to collect. List the real options for each destination in the flow:
 
 ```
 converly destinations conversions google-ads
+converly destinations conversions meta
 ```
 
-Use the `id` of the conversion the user wants (ask if several look plausible). If the list is empty, the user must create a conversion action in Google Ads first (Goals → Conversions → New conversion action), then re-run with `--refresh`.
+Show the user what came back and ask which one this form represents. Meta alone returns around seventeen standard events (Lead, Contact, Schedule, Subscribe, CompleteRegistration and more), so picking "Lead" yourself is a guess, not a default. If a Google Ads list comes back empty, the user has to create a conversion action first (Goals → Conversions → New conversion action), then re-run with `--refresh`.
+
+Once they have chosen, Google Ads takes the `id`:
 
 ```
 converly flows create --site site_XXXX --name "Demo requests" \
   --trigger generic-form --destination google-ads --conversion-id 123456789
 ```
 
-For Meta or GA4, use an event name instead of a conversion id:
+Meta and GA4 take the event name (say the user picked Contact):
 
 ```
-converly flows create --site site_XXXX --name "Leads to Meta" \
-  --trigger webflow-forms --destination meta --event-name Lead
+converly flows create --site site_XXXX --name "Demo requests" \
+  --trigger webflow-forms --destination meta --event-name Contact
 ```
+
+If the user wants an event that is NOT in the standard list (their own "Subscribed to blog", for instance), add `--custom` so the platform is told it is a custom event. The simple form above sets that flag for you; if you build the action with `--json` instead, include `conversion.is_custom` yourself or the flow will fail validation.
 
 Add `--value 50 --currency USD` if the user wants a conversion value. Restrict to specific pages with `--pages /contact,/demo`. For a connected platform (Typeform, Jotform, Calendly, Acuity) you can narrow to one real form or event type. List them with `converly triggers options <slug> --site <id>`, then set `trigger_config.conditions` via `--json`. For anything richer (multiple actions), pass the whole flow body with `--json`; run `converly actions <destination>` to see each destination's config schema.
 
