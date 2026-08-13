@@ -27,8 +27,31 @@ Every CLI command prints one JSON document to stdout. Exit code 0 means success.
 5. **Set the site's domain before publishing.** A site with `"domain": null` rejects every event server side. The flow will publish fine and capture nothing. Check `converly sites list` and fix with `converly sites update <site_id> --domain <their-domain>` before you publish.
 6. **Destructive actions need explicit user confirmation first.** Deleting a flow (`flows delete` requires `--yes`), unpublishing a flow that is live, disconnecting a destination, or any DELETE via `converly api`. Never do these on your own initiative, even for things you created this session.
 7. **If a command fails twice with the same error, stop and show the user the error.** Do not loop retries. If you must retry a create command after an ambiguous failure, re-run it with the same `--idempotency-key` value so it cannot double-create.
+8. **Never choose the conversion for the user.** Run `converly destinations conversions <destination>`, show them the real list, and ask which one this form represents. A wrong conversion still reports success while quietly corrupting the numbers they are trying to collect. Google Ads can only fire conversion actions that already exist in their Google Ads account, so if none fit they create one there and you re-list with `--refresh`. Meta and GA4 take a standard event from the list, or a name of the user's own with `--custom`.
 
-## Setup
+## The setup workflow
+
+**Collect four facts before you build anything.** Answer them yourself
+from the repo or page when you have access; otherwise ask the user, all
+in one message rather than drip-feeding:
+
+1. **The website address.** Without it every conversion is rejected
+   server side (hard rule 5).
+2. **Which tool renders the form** (or booking widget / chat box). This
+   picks the trigger, decides which detection code loads on the site,
+   and decides whether a connect step is needed first (step 3).
+3. **What should count as the conversion.** If something must happen
+   after submission before it really counts (email verification,
+   payment, onboarding), a form trigger overcounts; use the `api`
+   trigger instead and say why.
+4. **Which ad platforms the conversions should go to.** Google Ads,
+   Meta, GA4 and the rest. One flow can fire to several at once. You
+   cannot pick a destination without this, and the conversion the user
+   chooses in step 4 lives inside whichever platform they name.
+
+Work through these steps in order.
+
+### 1. Log in or create an account
 
 Install the CLI if it is missing:
 
@@ -38,31 +61,20 @@ npm install -g @converly/cli
 
 (Or run every command through `npx @converly/cli ...` without installing.)
 
-Authenticate. First check state with `converly whoami`:
+Then check where you stand:
+
+```
+converly whoami
+```
 
 - If it succeeds, you are logged in. It returns the subscription and the account's sites.
 - If it fails with `not_logged_in`, run `converly login` and tell the user a browser window will open for them to log in. If they do not have a Converly account yet, run `converly login --signup` instead. Signing up starts a free trial automatically, no card needed. Wait for the command to finish, then re-run `converly whoami`.
+- On a server, in CI, or anywhere without a browser, use `converly login --device`. It prints a short code and a URL the user opens on any device (their phone is fine); they approve there and the CLI picks the credential up. The CLI selects this automatically when no browser is available.
 - If `CONVERLY_API_KEY` is set in the environment, the CLI uses it automatically for Converly's own deployments. If commands then fail saying the key was rejected, the key is bad. Ask the user to replace or unset it; do not try to work around it.
 
-## The setup workflow
+At any point, `converly status` prints the ordered setup checklist for a site: what is done, what needs action, and the exact command for each. Run it whenever you are unsure what comes next.
 
-**Collect three facts before you build anything.** Answer them yourself
-from the repo or page when you have access; otherwise ask the user, all
-in one message rather than drip-feeding:
-
-1. **The website address.** Without it every conversion is rejected
-   server side (hard rule 5).
-2. **Which tool renders the form** (or booking widget / chat box). This
-   picks the trigger, decides which detection code loads on the site,
-   and decides whether a connect step is needed first (step 4).
-3. **What should count as the conversion.** If something must happen
-   after submission before it really counts (email verification,
-   payment, onboarding), a form trigger overcounts; use the `api`
-   trigger instead and say why.
-
-Work through these steps in order. Steps 3 and 4 can run in parallel.
-
-### 1. Pick the site
+### 2. Pick the site and set its domain
 
 ```
 converly sites list
@@ -76,47 +88,7 @@ converly sites update site_XXXX --domain example.com
 
 Use the site's real public domain. One domain covers both the apex and its www variant.
 
-### 2. Install the tracking snippet
-
-```
-converly install snippet site_XXXX
-```
-
-Returns the `<script>` tag.
-
-- **If you have access to the website's codebase** (you are running in their repo, or can edit their site), add the snippet to the `<head>` of every page yourself and deploy it. Say what you changed.
-- **If you do not**, give the user the snippet with one clear instruction: paste it into the `<head>` of every page, or into their site builder's custom code slot (Settings → Custom Code in Webflow / Wix / Squarespace, a header scripts plugin in WordPress).
-
-Check with `converly install status site_XXXX`. Read `detection` carefully:
-
-- `"confirmed"` means tracking is proven live.
-- `"never_seen"` does NOT mean the snippet is missing. A correctly installed site that has not captured a conversion yet looks exactly like this. Do not tell the user the install failed based on this value. The test event in step 6 checks the delivery half; the install itself is proven by a real submission appearing in `converly events list` (hard rule 3).
-
-### 3. Connect the ad platform
-
-See what is available and what is already connected:
-
-```
-converly destinations list
-```
-
-**First check whether this destination needs a connection at all.** In the `destinations types` output, a destination with an empty `connection_types` list is browser side (Microsoft Ads, X Ads, Pinterest, Snapchat, the analytics pixels): there is nothing to connect, skip straight to step 4. Details in [references/destinations.md](references/destinations.md).
-
-For connected destinations (`google-ads`, `meta`, `google-analytics`, `linkedin-ads`, `tiktok-ads`, `reddit-ads`) showing `"connected": false`:
-
-```
-converly destinations connect google-ads --site site_XXXX
-```
-
-Give the user the returned `url` and say: "Open this link in your browser to connect your Google Ads account." Then poll until they finish:
-
-```
-converly handoffs wait hdf_XXXX
-```
-
-This blocks up to 10 minutes; the link itself is valid for 30. If the wait times out while the link is still valid, re-run `handoffs wait` with the same id rather than creating a new link (the error message tells you which case you are in). Destinations are account wide, so one connection serves every flow.
-
-### 4. Find the trigger, and connect it if it needs connecting
+### 3. Choose the trigger, and connect it if it needs connecting
 
 The trigger is the form tool on the user's website. Get the catalogue:
 
@@ -154,18 +126,45 @@ Before choosing a trigger type at all, apply fact 3 from the interview. If there
 
 The `api` trigger has no form tool to detect, so its setup is different. Connect it with `converly triggers connect api --site site_XXXX`, which hands back a webhook URL and secret that the user's backend calls when the conversion is confirmed. For a Node backend, the `@converly/sdk-node` package does the signed call in a few lines (`npm install @converly/sdk-node`, then `createClient` and `completeSignup`). Other stacks call the webhook directly. The full backend guide is at developers.converly.io/api-trigger. This needs code access, so it suits agents working in the site's repo.
 
-### 5. Create and publish the flow
+### 4. Connect the destination and choose the conversion
 
-**Always let the user pick the conversion. Never choose one for them.** Every destination has its own list, and firing the wrong one quietly corrupts the numbers the user is trying to collect. List the real options for each destination in the flow:
+See what is available and what is already connected:
+
+```
+converly destinations list
+```
+
+**First check whether this destination needs a connection at all.** In the `destinations types` output, a destination with an empty `connection_types` list is browser side (Microsoft Ads, X Ads, Pinterest, Snapchat, the analytics pixels). There is nothing to connect, so skip the connect commands here and go straight to choosing the conversion below. Details in [references/destinations.md](references/destinations.md).
+
+For connected destinations (`google-ads`, `meta`, `google-analytics`, `linkedin-ads`, `tiktok-ads`, `reddit-ads`) showing `"connected": false`:
+
+```
+converly destinations connect google-ads --site site_XXXX
+```
+
+Give the user the returned `url` and say: "Open this link in your browser to connect your Google Ads account." Then poll until they finish:
+
+```
+converly handoffs wait hdf_XXXX
+```
+
+This blocks up to 10 minutes; the link itself is valid for 30. If the wait times out while the link is still valid, re-run `handoffs wait` with the same id rather than creating a new link (the error message tells you which case you are in). Destinations are account wide, so one connection serves every flow.
+
+**Now choose the conversion, and let the user choose it (hard rule 8).** The connect step above only links the account. It does not decide which conversion gets fired, and that decision is the user's:
 
 ```
 converly destinations conversions google-ads
 converly destinations conversions meta
 ```
 
-Show the user what came back and ask which one this form represents. Meta alone returns around seventeen standard events (Lead, Contact, Schedule, Subscribe, CompleteRegistration and more), so picking "Lead" yourself is a guess, not a default. If a Google Ads list comes back empty, the user has to create a conversion action first (Goals → Conversions → New conversion action), then re-run with `--refresh`.
+Show the user what came back and ask which one this form represents. Meta alone returns around seventeen standard events (Lead, Contact, Schedule, Subscribe, CompleteRegistration and more), so picking "Lead" yourself is a guess, not a default.
 
-Once they have chosen, Google Ads takes the `id`:
+- **Google Ads** can only fire conversion actions that already exist in their account. If the list is empty or nothing fits, the user creates one in Google Ads (Goals → Conversions → New conversion action), then you re-list with `--refresh`.
+- **Meta and GA4** take a standard event from the list, or an event of the user's own naming. For their own, pass `--custom` so the platform is told it is a custom event.
+
+### 5. Create and publish the flow
+
+Google Ads takes the conversion `id`:
 
 ```
 converly flows create --site site_XXXX --name "Demo requests" \
@@ -179,7 +178,7 @@ converly flows create --site site_XXXX --name "Demo requests" \
   --trigger webflow-forms --destination meta --event-name Contact
 ```
 
-If the user wants an event that is NOT in the standard list (their own "Subscribed to blog", for instance), add `--custom` so the platform is told it is a custom event. The simple form above sets that flag for you; if you build the action with `--json` instead, include `conversion.is_custom` yourself or the flow will fail validation.
+The simple form above sets the custom-event flag for you. If you build the action with `--json` instead, include `conversion.is_custom` yourself or the flow will fail validation.
 
 Add `--value 50 --currency USD` if the user wants a conversion value. Restrict to specific pages with `--pages /contact,/demo`. For a connected platform (Typeform, Jotform, Calendly, Acuity) you can narrow to one real form or event type. List them with `converly triggers options <slug> --site <id>`, then set `trigger_config.conditions` via `--json`. For anything richer (multiple actions), pass the whole flow body with `--json`; run `converly actions <destination>` to see each destination's config schema.
 
@@ -192,7 +191,23 @@ converly flows publish flow_XXXX
 
 `validate` returns `problems[]` (blockers, fix before publishing) and `warnings[]` (site readiness, for example `site_missing_domain`). Take warnings seriously, they are the "publishes fine, captures nothing" cases.
 
-### 6. Verify
+### 6. Install the tracking snippet
+
+```
+converly install snippet site_XXXX
+```
+
+Returns the `<script>` tag.
+
+- **If you have access to the website's codebase** (you are running in their repo, or can edit their site), add the snippet to the `<head>` of every page yourself and deploy it. Say what you changed.
+- **If you do not**, give the user the snippet with one clear instruction: paste it into the `<head>` of every page, or into their site builder's custom code slot (Settings → Custom Code in Webflow / Wix / Squarespace, a header scripts plugin in WordPress). Site builders need the site republished before the change is live.
+
+Check with `converly install status site_XXXX`. Read `detection` carefully:
+
+- `"confirmed"` means tracking is proven live.
+- `"never_seen"` does NOT mean the snippet is missing. A correctly installed site that has not captured a conversion yet looks exactly like this. Do not tell the user the install failed based on this value. The test event in step 7 checks the delivery half; the install itself is proven by a real submission appearing in `converly events list` (hard rule 3).
+
+### 7. Verify
 
 Verification has two halves. Do both when you can, and say exactly which you did.
 
@@ -208,17 +223,6 @@ This fires a test conversion through Converly's server to the ad platform and re
 
 Report accordingly. After delivery only: "Delivery to [platform] is verified with a test conversion. The final check is one real form submission, which will appear in the conversion log." After both: "Tracking is verified end to end."
 
-### 7. Internal-traffic rules: registration only, NOT enforced yet
-
-`converly rules create` records an exclusion rule, but the rules are not
-applied anywhere today — a matching submission still fires to every
-destination. Do NOT offer this as a way to keep test traffic out, and
-never tell the user their team's submissions are being excluded. If they
-ask, say plainly that exclusion rules are planned but not active, and
-that internal test conversions mostly cannot become ad conversions
-anyway (no ad click to match). This section updates when enforcement
-ships.
-
 ## After setup: reading results
 
 This is the ongoing value. When the user asks "did my ads convert", "is tracking still working", or "who converted this week":
@@ -229,9 +233,7 @@ converly events list --since 2026-08-01T00:00:00Z --status failed
 converly events get evt_XXXX
 ```
 
-Each event carries per destination delivery status. `converly events get` shows exactly what the ad platform returned, plus any pipeline notices with user facing explanations. If a user reports a specific lead, find it with `--email person@example.com`.
-
-Health checks: `converly install status <site>` (is the loader still live), `converly flows list` (is the flow still published), `converly subscription` (is the account in good standing).
+`events list` is a bounded snapshot of the most recent events (max 100, no paging). Narrow with `--since`, `--flow`, `--email` or `--status` rather than trying to page. `events get` shows the per destination delivery result for one event, which is where you look when a conversion did not reach a platform.
 
 ## Common gotchas
 
@@ -247,25 +249,29 @@ Health checks: `converly install status <site>` (is the loader still live), `con
 
 ## Quick reference
 
-Every line below is one complete, runnable command.
+Every line below is one complete, runnable command, in roughly the order you need them.
 
 ```
 converly login --signup                        # browser login, trial auto starts on signup
+converly login --device                        # headless, approve from any device
 converly whoami                                # account, subscription, sites
+converly status                                # the ordered setup checklist for a site
 converly sites list
 converly sites update <site_id> --domain example.com
-converly install snippet <site_id>
-converly install status <site_id>
+converly triggers                              # form tool slugs
+converly triggers connect <source> --site <site_id>  # requires_connection providers only
+converly triggers options <source> --site <site_id>  # that platform's real forms / event types
 converly destinations types                    # catalogue incl. connection_types
 converly destinations list                     # what's connected
 converly destinations connect <type> --site <site_id>
 converly handoffs wait <hdf_id>                # block until human finishes OAuth
-converly triggers                              # form tool slugs
-converly destinations conversions <type>       # pickable conversion actions
+converly destinations conversions <type>       # the conversions to OFFER the user
 converly actions <type>                        # action config schema
 converly flows create --site <site_id> --name "X" --trigger <slug> --destination <type> --conversion-id <id>
 converly flows validate <flow_id>
 converly flows publish <flow_id>
+converly install snippet <site_id>
+converly install status <site_id>
 converly test-event --flow <flow_id>           # verify destination delivery
 converly events list --limit 20                # the conversion log
 converly events get <evt_id>                   # per destination delivery detail
