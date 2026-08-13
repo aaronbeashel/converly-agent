@@ -27,7 +27,7 @@ Every CLI command prints one JSON document to stdout. Exit code 0 means success.
 5. **Set the site's domain before publishing.** A site with `"domain": null` rejects every event server side. The flow will publish fine and capture nothing. Check `converly sites list` and fix with `converly sites update <site_id> --domain <their-domain>` before you publish.
 6. **Destructive actions need explicit user confirmation first.** Deleting a flow (`flows delete` requires `--yes`), unpublishing a flow that is live, disconnecting a destination, or any DELETE via `converly api`. Never do these on your own initiative, even for things you created this session.
 7. **If a command fails twice with the same error, stop and show the user the error.** Do not loop retries. If you must retry a create command after an ambiguous failure, re-run it with the same `--idempotency-key` value so it cannot double-create.
-8. **Never choose the conversion for the user.** Run `converly destinations conversions <destination>`, show them the real list, and ask which one this form represents. A wrong conversion still reports success while quietly corrupting the numbers they are trying to collect. Google Ads can only fire conversion actions that already exist in their Google Ads account, so if none fit they create one there and you re-list with `--refresh`. Meta and GA4 take a standard event from the list, or a name of the user's own with `--custom`.
+8. **Never choose the conversion for the user.** Always run `converly destinations conversions <destination>` first, whatever the platform. If it returns options, show them and ask which one this form represents. If it comes back empty or errors, ask the user what the conversion should be called rather than inventing one. A wrong conversion still reports success while quietly corrupting the numbers they are trying to collect. Google Ads can only fire conversion actions that already exist in their Google Ads account, so if none fit they create one there and you re-list with `--refresh`. Meta and GA4 take a standard event from the list, or a name of the user's own with `--custom`.
 
 ## The setup workflow
 
@@ -150,14 +150,22 @@ converly handoffs wait hdf_XXXX
 
 This blocks up to 10 minutes; the link itself is valid for 30. If the wait times out while the link is still valid, re-run `handoffs wait` with the same id rather than creating a new link (the error message tells you which case you are in). Destinations are account wide, so one connection serves every flow.
 
-**Now choose the conversion, and let the user choose it (hard rule 8).** The connect step above only links the account. It does not decide which conversion gets fired, and that decision is the user's:
+**Now choose the conversion, and let the user choose it (hard rule 8).** The connect step above only links the account. It does not decide which conversion gets fired, and that decision is the user's.
+
+First see what this destination needs, then always TRY to fetch its real options:
 
 ```
-converly destinations conversions google-ads
-converly destinations conversions meta
+converly actions <destination>
+converly destinations conversions <destination>
 ```
 
-Show the user what came back and ask which one this form represents. Meta alone returns around seventeen standard events (Lead, Contact, Schedule, Subscribe, CompleteRegistration and more), so picking "Lead" yourself is a guess, not a default.
+**Always run the conversions command, whatever the destination.** Which platforms serve a list is not something you can infer from the field schema, so ask the API rather than assuming. Three outcomes:
+
+- **It returns options.** Show them to the user and ask which one this form represents. This is the normal path for Google Ads (conversion action ids), Meta and GA4 (event names), ChatGPT Ads and Reddit.
+- **It returns an empty list.** Do not treat that as "there are none". It usually means the destination is not connected yet, or the user has not created any. For Google Ads specifically, they create one in Google Ads (Goals → Conversions → New conversion action), then you re-list with `--refresh`.
+- **It errors, or the platform has no list at all.** Ask the user what this conversion should be called and use their answer. Never invent a name yourself.
+
+Meta alone returns around seventeen standard events (Lead, Contact, Schedule, Subscribe, CompleteRegistration and more), so choosing "Lead" yourself is a guess, not a default. Per platform specifics are in [references/destinations.md](references/destinations.md).
 
 - **Google Ads** can only fire conversion actions that already exist in their account. If the list is empty or nothing fits, the user creates one in Google Ads (Goals → Conversions → New conversion action), then you re-list with `--refresh`.
 - **Meta and GA4** take a standard event from the list, or an event of the user's own naming. For their own, pass `--custom` so the platform is told it is a custom event.
