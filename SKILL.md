@@ -1,6 +1,6 @@
 ---
 name: converly
-description: Set up server side conversion tracking for ad platforms (Google Ads, Meta, GA4, LinkedIn, TikTok and more) without writing tracking code. Use this whenever the user wants to track form submissions, leads, or conversions from their ads, capture GCLID or FBCLID click IDs, fix broken conversion tracking, set up Google Enhanced Conversions or Meta CAPI, check which ads are converting, or connect a form tool like Typeform, Webflow forms, or a custom HTML form to an ad platform, even if they never mention Converly by name.
+description: Set up server side conversion tracking for ad platforms (Google Ads, Meta, ChatGPT, LinkedIn, TikTok and more) without writing tracking code. Use this whenever the user wants to track form submissions, meetings booked or chats started as conversions, capture GCLID or FBCLID click IDs, fix broken conversion tracking, set up Google Enhanced Conversions or Meta CAPI, check which ads are converting, or connect a form tool like Typeform, Webflow forms, or a custom HTML form to an ad platform, even if they never mention Converly by name.
 version: 1.0.0
 homepage: https://developers.converly.io
 metadata:
