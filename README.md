@@ -15,7 +15,7 @@ clawhub install converly
 Claude Code / Codex and other skill compatible agents:
 
 ```bash
-npx skills add aaronbeashel/converly-agent
+npx skills add converlyio/converly-agent
 ```
 
 Then ask your agent something like: "Set up conversion tracking so my Google Ads account knows when someone submits the demo form."
