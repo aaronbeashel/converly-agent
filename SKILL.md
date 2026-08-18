@@ -22,7 +22,7 @@ Every CLI command prints one JSON document to stdout. Exit code 0 means success.
 
 1. **Never handle credentials in chat.** Do not ask the user to paste an API key, and never print `CONVERLY_API_KEY` or any token. Authentication is `converly login`, which happens in the user's browser.
 2. **Connecting an ad platform requires a human.** `converly destinations connect` returns a URL the user must open in their browser. Never claim a destination is connected until `converly handoffs wait <id>` returns `"status": "completed"`. Never skip this step, and never work around it by asking for tokens.
-3. **Be precise about what is verified.** `converly test-event` returning `"server_status": "success"` proves the DELIVERY half: Converly can reach the ad platform and the platform accepted the conversion. It does not prove the website half (snippet on the page, right form tool slug). Full proof is `install status` showing `"detection": "confirmed"`, or a real form submission appearing in `converly events list` with a successful action status. Report exactly which level you verified. Publishing a flow proves nothing by itself.
+3. **Be precise about what is verified.** `converly test-event` returning `"server_status": "success"` proves the DELIVERY half: Converly can reach the ad platform and the platform accepted the conversion. `install status` showing `"detection": "confirmed"` proves the loader is on the page and running (it phones home on page load). Neither proves the form itself gets detected. Full proof of capture is a real form submission appearing in `converly events list` with a successful action status. Report exactly which level you verified. Publishing a flow proves nothing by itself.
 4. **Never pass `--allow-real` without the user's explicit agreement in this conversation.** It reports a real conversion to their ad platform. Ask, wait for yes, then run it.
 5. **Set the site's domain before publishing.** A site with `"domain": null` rejects every event server side. The flow will publish fine and capture nothing. Check `converly sites list` and fix with `converly sites update <site_id> --domain <their-domain>` before you publish.
 6. **Destructive actions need explicit user confirmation first.** Deleting a flow (`flows delete` requires `--yes`), unpublishing a flow that is live, disconnecting a destination, or any DELETE via `converly api`. Never do these on your own initiative, even for things you created this session.
@@ -210,10 +210,10 @@ Returns the `<script>` tag.
 - **If you have access to the website's codebase** (you are running in their repo, or can edit their site), add the snippet to the `<head>` of every page yourself and deploy it. Say what you changed.
 - **If you do not**, give the user the snippet with one clear instruction: paste it into the `<head>` of every page, or into their site builder's custom code slot (Settings → Custom Code in Webflow / Wix / Squarespace, a header scripts plugin in WordPress). Site builders need the site republished before the change is live.
 
-Check with `converly install status site_XXXX`. Read `detection` carefully:
+Check with `converly install status site_XXXX`. The loader phones home when a page loads, so the check is quick. Have any page of the site opened once in a real browser, then re-run the command. If you have browser tools, open the page yourself. Read `detection`:
 
-- `"confirmed"` means tracking is proven live.
-- `"never_seen"` does NOT mean the snippet is missing. A correctly installed site that has not captured a conversion yet looks exactly like this. Do not tell the user the install failed based on this value. The test event in step 7 checks the delivery half; the install itself is proven by a real submission appearing in `converly events list` (hard rule 3).
+- `"confirmed"` means the loader has been seen running on the site (or a conversion was already captured). If the response carries `origin_authorized: false`, the loader runs but the site's domain does not match, so conversions get rejected. Fix the domain with `converly sites update` and have the page reloaded.
+- `"never_seen"` means the loader has never phoned home. If a page has been loaded since installing and it still says this, the snippet is probably not live yet (site builders need a republish). Two blind spots never send heartbeats: sites installed through the Converly Webflow app, and visitors with privacy signals or unconsented cookie banners. For those, prove the install with a real submission appearing in `converly events list` (hard rule 3).
 
 ### 7. Verify
 
@@ -227,7 +227,7 @@ converly test-event --flow flow_XXXX
 
 This fires a test conversion through Converly's server to the ad platform and returns the platform's response. `"server_status": "success"` proves the connection, the flow config, and the conversion mapping all work. For Meta pass `--meta-code` (from Meta Events Manager → Test events), for Reddit `--reddit-id`, for TikTok `--tiktok-code`, and the test then stays out of real data. Google Ads, GA4, LinkedIn and ChatGPT Ads have no sandbox mode, so the command will refuse with `would_create_real_conversion`. For those, either get the user's explicit OK to send one real test conversion and re-run with `--allow-real` (hard rule 4), or skip the test event and verify with a live form submission instead.
 
-**Capture (proves the website half):** either `converly install status site_XXXX` already shows `"detection": "confirmed"`, or ask the user to submit the real form once, then find that submission in `converly events list` with a successful action status.
+**Capture (proves the website half):** `converly install status site_XXXX` showing `"detection": "confirmed"` proves the loader is running on the site (load a page once to trigger it). The form itself is proven by a real submission: ask the user to submit the form once, then find it in `converly events list` with a successful action status.
 
 Report accordingly. After delivery only: "Delivery to [platform] is verified with a test conversion. The final check is one real form submission, which will appear in the conversion log." After both: "Tracking is verified end to end."
 

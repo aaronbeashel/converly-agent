@@ -44,7 +44,7 @@ To adjust an existing flow, pass just the changed field to `converly flows updat
 
 Work through, in order:
 
-1. `converly install status <site>`. Read `detection` precisely: `"confirmed"` means the site half works, look further down this list. `"never_seen"` is NOT proof the snippet is missing (a correct install with no conversions yet looks identical), it just means nothing is proven yet. `"pending"` means the check itself couldn't run right now, try again shortly. Only conclude "snippet missing" from actually inspecting the page's HTML, never from this endpoint.
+1. `converly install status <site>`. The loader phones home on page load, so have any page of the site opened once, then re-run. Read `detection` precisely: `"confirmed"` means the loader runs on the site, look further down this list (and if `origin_authorized` is false, the domain is wrong, fix it with `sites update`). `"never_seen"` after a fresh page load means the snippet is probably not live (site builders need a republish), except for two heartbeat blind spots: Converly Webflow app installs and privacy-signal visitors, where only a real submission in `events list` proves the install. `"pending"` means the check itself couldn't run right now, try again shortly.
 2. Site domain set and matching the real origin? `converly sites list` → `domain`. A staging URL or a different subdomain will be rejected.
 3. Flow published? `converly flows get <id>` → `status` must be `published`, `publication_state` should be `in_sync`.
 4. Right provider slug for what actually renders the form? (See "Picking the right slug".)
